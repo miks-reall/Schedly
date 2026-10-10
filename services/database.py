@@ -342,11 +342,8 @@ class BaseRepository(Generic[T]):
     async def get_all_by(self, **kwargs) -> Sequence[T]:
         stmt = select(self.model)
         filters = [getattr(self.model,k) == v for k,v in kwargs.items() if v is not None]
-
-        if not filters:
-            return []
         
-        stmt.where(and_(*filters))
+        stmt = stmt.where(and_(*filters))
         result = await self.session.execute(stmt)
 
         return result.scalars().all()

@@ -42,7 +42,7 @@ ITEMS_PER_PAGE = 6
 #inits
 db = Database(async_session)
 
-'''------------------- KEYBOARDS -------------------'''
+#------------------- KEYBOARDS -------------------''
 
 # keyboard for group selection with pagination
 def join_kb(page: int = 0) -> Keyboard:

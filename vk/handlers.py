@@ -104,7 +104,7 @@ labeler = BotLabeler()
 db = Database(async_session)
 
 
-'''------------HANDLERS--------------------'''
+#------------HANDLERS---------------------
 
 # welcome message for first call
 @labeler.message(text=["/start", "/bot", "/schedly"])

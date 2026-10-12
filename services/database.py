@@ -4,7 +4,7 @@ import asyncpg
 from sqlalchemy import select, update, delete, or_, and_
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import BigInteger, SmallInteger, Date, func, CheckConstraint, Sequence, ForeignKey, UniqueConstraint, ARRAY, String, TypeDecorator
+from sqlalchemy import BigInteger, SmallInteger, Date, func, CheckConstraint, Sequence, ForeignKey, UniqueConstraint, ARRAY, String, TypeDecorator, Integer, Boolean
 from dotenv import load_dotenv
 from os import getenv
 from enum import IntEnum
@@ -33,25 +33,6 @@ cipher = Fernet(SECRET_KEY)
 async def init_models():
     async with engine.begin() as conn:
         await conn.run_sync(BaseModel.metadata.create_all)
-
-
-#----------Encryption-------------
-
-class EncryptedString(TypeDecorator):
-    impl = String
-    cache_ok = True
-
-    def process_bind_param(self, value, dialect):
-        if value is not None:
-            enc_bytes = cipher.encrypt(value.encode("utf-8"))
-            return enc_bytes.decode("utf-8")
-        return value
-
-    def process_result_value(self, value, dialect):
-        if value is not None:
-            dec_bytes = cipher.decrypt(value.encode("utf-8"))
-            return dec_bytes.decode("utf-8")
-        return value
 
 #-----------------TABLES--------------------
 
@@ -271,18 +252,62 @@ class HomeworkModel(BaseModel):
         nullable=False
     )
     task: Mapped[str] = mapped_column(
-        EncryptedString,
+        String,
         unique=False,
         nullable=False
     )
     attachment: Mapped[list[str]] = mapped_column(
-        ARRAY(EncryptedString),
+        ARRAY(String),
         default=list,
         nullable=False
     )
+    created_at: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+        unique=False
+    )
+    policy_type: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        unique=False
+    )
 
-class ArchiveHomeworkModel(BaseModel):
-    __tablename__ = "archive_homework"
+class HomeworkPolicyModel(BaseModel):
+    __tablename__ = "homework_policy"
+
+    id:Mapped[int] = mapped_column(
+        primary_key=True,
+        autoincrement=True
+    )
+    homework_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "homework.id",
+            ondelete="CASCADE"
+        ),
+        nullable=False
+    )
+    lessons_left: Mapped[int] = mapped_column(
+        SmallInteger,
+        nullable=True
+    )
+    expires_at: Mapped[date] = mapped_column(
+        Date,
+        nullable=True
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "lesons_left IS NOT NULL OR expires_at IS NOT NULL",
+            name="check_lessons_expires"
+        )
+    )
+
+class HomeworkScheduleModel(BaseModel):
+    __tablename__ = "homework_schedule"
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
@@ -292,18 +317,25 @@ class ArchiveHomeworkModel(BaseModel):
         ForeignKey(
             "schedule.id",
             ondelete="CASCADE"
-        )
-    )
-    task: Mapped[str] = mapped_column(
-        EncryptedString,
-        unique=False,
+        ),
         nullable=False
     )
-    attachment: Mapped[list[str]] = mapped_column(
-        ARRAY(EncryptedString),
-        default=list,
+    homework_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "homework.id",
+            ondelete="CASCADE"
+        ),
         nullable=False
     )
+    assigned_date: Mapped[date] = mapped_column(
+        ForeignKey(
+            "schedule.date",
+            ondelete="CASCADE"
+        ),
+        nullable=False
+    )
+
+
 
 class DownloadHistoryModel(BaseModel):
     __tablename__ = "download_history"
@@ -323,7 +355,7 @@ class DownloadHistoryModel(BaseModel):
     )
 
 
-#----------REPOS-----------
+#----------BASE REPOSITORY-----------
 
 T = TypeVar('T')
         
@@ -381,6 +413,8 @@ class BaseRepository(Generic[T]):
         return result.rowcount
     
 
+#-------------------OTHER REPOSITORIES---------------------
+
 class UserRepository(BaseRepository[UserModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(UserModel, session)
@@ -430,12 +464,6 @@ class UserRepository(BaseRepository[UserModel]):
         user = await self.add(**params_clean)
         log.info(f"New user added to databse")
         return user
-
-        
-        
-
-        
-
         
 
 class GroupRepository(BaseRepository[GroupModel]):
@@ -449,10 +477,10 @@ class GroupRepository(BaseRepository[GroupModel]):
     ) -> GroupModel:
 
         if not any((tg_id,vk_id)):
-            raise ValueError("tg_id or vk_id is NoneType object")
+            raise ValueError("tg_id or vk_id is NoneType")
 
         if not code:
-            raise ValueError("Group code is NoneType object")
+            raise ValueError("Group code is NoneType")
 
         params = locals()
         params.pop("self")
@@ -472,8 +500,6 @@ class GroupRepository(BaseRepository[GroupModel]):
         group = await self.add(**params_clean)
         log.info("New group added to the database")
         return group
-    
-
 
 
 class SubjectRepository(BaseRepository[SubjectModel]):
@@ -487,7 +513,7 @@ class SubjectRepository(BaseRepository[SubjectModel]):
     ) -> SubjectModel:
         
         if not all((title, group_id)):
-            raise ValueError("Title or Group id are NoneType objects")
+            raise ValueError("Title or Group id are NoneType")
 
         params = locals()
         params.pop("self")
@@ -501,9 +527,6 @@ class SubjectRepository(BaseRepository[SubjectModel]):
 
         subject = await self.add(**params)
         log.info("New subject added to the database")
-
-        
-        
 
 
 class ScheduleRepository(BaseRepository[ScheduleModel]):
@@ -520,15 +543,19 @@ class HomeworkRepository(BaseRepository[HomeworkModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(HomeworkModel, session)
 
+class HomeworkPolicyRepository(BaseRepository[HomeworkPolicyModel]):
+    def __init__(self, session: AsyncSession):
+        super().__init__(HomeworkPolicyModel, session)
 
-class ArchiveRepository(BaseRepository[ArchiveHomeworkModel]):
-    def __init__(self, session:AsyncSession):
-        super().__init__(ArchiveHomeworkModel, session)
+class HomeworkScheduleRepository(BaseRepository[HomeworkScheduleModel]):
+    def __init__(self, session: AsyncSession):
+        super().__init__(HomeworkScheduleModel, session)
 
 class DownloadHistoryRepository(BaseRepository[DownloadHistoryModel]):
     def __init__(self, session:AsyncSession):
         super().__init__(DownloadHistoryModel, session)
 
+#------------DATABASE CLASS----------------
 class Database:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -539,5 +566,6 @@ class Database:
         self.schedule = ScheduleRepository(session=self.session)
         self.grades = GradeRepository(session=self.session)
         self.homework = HomeworkRepository(session=self.session)
-        self.archive_homework = ArchiveRepository(session=self.session)
+        self.homework_policy = HomeworkPolicyRepository(session=self.session)
+        self.homework_schedule = HomeworkScheduleRepository(session=self.session)
         self.download_history = DownloadHistoryRepository(session=self.session)

@@ -59,11 +59,14 @@ class UserModel(BaseModel):
         autoincrement=True
     )
     group_id: Mapped[int] = mapped_column(
-        BigInteger,
-        unique=False,
-        nullable=True
+        ForeignKey(
+            "groups.id",
+            ondelete="CASCADE"
+        ),
+        nullable = False,
+        unique = False
     )
-    full_name: Mapped[str] = mapped_column(
+    name: Mapped[str] = mapped_column(
         nullable=True,
         unique=False
     )
@@ -97,6 +100,11 @@ class UserModel(BaseModel):
         nullable=False,
         unique=False
     )
+    date_reg: Mapped[date] = mapped_column(
+        Date,
+        nullable = False,
+        unique = False
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -116,16 +124,67 @@ class GroupModel(BaseModel):
         unique=True,
         nullable=False
     )
-    tg_id: Mapped[list[int]] = mapped_column(
-        ARRAY(BigInteger),
-        default = list(),
-        nullable=True
+    is_actualy: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable = False
     )
-    vk_id: Mapped[list[int]] = mapped_column(
-        ARRAY(BigInteger),
-        default = list(),
-        nullable=True
+
+class GroupsVkModel(BaseModel):
+    __tablename__ = "groups_vk"
+
+    id: Mapped[int] = mapped_column(
+        autoincrement=True,
+        primary_key=True
     )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "groups.id",
+            ondelete="CASCADE"
+        ),
+        nullable = False
+    )
+    vk_id: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable = False,
+        unique = True
+    )
+    title: Mapped[str] = mapped_column(
+        String,
+        nullable = True
+    )
+    users: Mapped[int] = mapped_column(
+        SmallInteger,
+        nullable = True
+    )
+
+class GroupsTgModel(BaseModel):
+    __tablename__ = "groups_tg"
+
+    id: Mapped[int] = mapped_column(
+        autoincrement=True,
+        primary_key=True
+    )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "groups.id",
+            ondelete="CASCADE"
+        ),
+        nullable = False
+    )
+    tg_id: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable = False,
+        unique = True
+    )
+    title: Mapped[str] = mapped_column(
+        String,
+        nullable = True
+    )
+    users: Mapped[int] = mapped_column(
+        SmallInteger,
+        nullable = True
+    )
+
 
 class SubjectModel(BaseModel):
     __tablename__ = "subjects"
@@ -174,7 +233,7 @@ class ScheduleModel(BaseModel):
         ),
         nullable=False
     )
-    period: Mapped[int] = mapped_column(
+    order: Mapped[int] = mapped_column(
         SmallInteger,
         nullable=False,
         unique=False
@@ -259,11 +318,6 @@ class HomeworkModel(BaseModel):
         nullable=False,
         unique=False
     )
-    policy_type: Mapped[str] = mapped_column(
-        String,
-        nullable=False,
-        unique=False
-    )
 
 class HomeworkPolicyModel(BaseModel):
     __tablename__ = "homework_policy"
@@ -278,6 +332,10 @@ class HomeworkPolicyModel(BaseModel):
             ondelete="CASCADE"
         ),
         nullable=False
+    )
+    policy: Mapped[str] = mapped_column(
+        String,
+        nullable = False
     )
     lessons_left: Mapped[int] = mapped_column(
         SmallInteger,
@@ -296,6 +354,10 @@ class HomeworkPolicyModel(BaseModel):
         CheckConstraint(
             "lessons_left IS NOT NULL OR expires_at IS NOT NULL",
             name="check_lessons_expires"
+        ),
+        CheckConstraint(
+            "policy IN ('NONE', 'COUNT', 'DATE')",
+            name = "policy_list"
         )
     )
 

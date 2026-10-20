@@ -96,7 +96,7 @@ from vkbottle.bot import BotLabeler, Message, MessageEvent
 from vkbottle import GroupEventType
 
 from services.database import Database, async_session
-from vk.keyboards import join_kb, close_kb, back_kb, review_kb
+from vk.keyboards import *
 from services.database import Database, async_session
 
 # inits
@@ -125,14 +125,62 @@ async def welcome_message(message: Message) -> None:
                 "Ало бизнес? Да-да деньги",
                 "К вашим услугам!"
             ]
+            kb = None
         else:
             WELCOME_TEXTS = [
-                "Привет! Я - Schedly, ваш учебный помощник!\nЯ много чего умею и готов всегда помогать! Пиши мне в любое время в лс или в группеЮ но сначала скажите из какой вы группы?",
-                "Всем привет! Я ваш учебный помощник - Schedly! Безотказный и готов трудить в поте лица 24/7!\nНо сначала мне нужно определить: какая у вас группа?"
+                "Привет! Я - Schedly, ваш учебный помощник!\nЯ много чего умею и готов всегда помогать! Пиши мне в любое время в лс или в группе, но сначала скажите из какой вы группы?",
+                "Всем привет! Я ваш учебный помощник - Schedly! Безотказный и готов трудиться в поте лица 24/7!\nНо сначала мне нужно определить: какая у вас группа?"
             ]
+            kb = join_kb()
     else:
         user = db.users.get_by(vk_id=from_id)
 
         if user:
-            WELCOME_TEXTS = []
+            WELCOME_TEXTS = [
+                "Привет! Рад что ты меня снова вызвал!\n Чем могу помочь?",
+                "What's up! Че как? Говори не стесняйся!",
+                "Охайо, пупсик! Что стряслось?",
+                "Приветствую, друг мой! Давай к делу!",
+                "Ало бизнес? Да-да деньги",
+                "К вашим услугам!"
+            ]
+            kb = None
+        else:
+            WELCOME_TEXTS = [
+                "Привет! Я - Schedly, твой учебный помощник!\nЯ много чего умею и готов всегда помогать! Пиши мне в любое время в лс или в группе, но сначала скажи из какой ты группы?",
+                "Хай! Я твой учебный помощник - Schedly! Безотказный и готов трудиться в поте лица 24/7!\nНо сначала мне нужно определить: какая у тебя группа?"
+            ]
+            kb = join_kb()
+
+    await message.answer(
+        message = choice(WELCOME_TEXTS),
+        keyboard = kb,
+        random_id = randint(0,100000)
+    )
+
+@labeler.raw_event(GroupEventType.MESSAGE_EVENT, dataclass=MessageEvent)
+async def callback_handle(event: MessageEvent):
+    payload = event.object.payload or {}
+    act = payload.get("act")
+    peer_id = event.object.peer_id
+
+    if act == "close":
+        await event.ctx_api.messages.delete(
+            peer_id=peer_id,
+            conversation_message_ids=[event.object.conversation_message_id],
+            delete_for_all=True
+        )
+        return
+
+    elif act == "nav_groups":
+        page = payload.get("page")
+        kb = join_kb(page = page)
+        await event.edit_message(message=f"Выберите группу (Стр. {page + 1}):", keyboard=kb)
+        return
+
+    elif act == "select_group":
+        if peer_id > 2000000000:
+            pass
+
+
     

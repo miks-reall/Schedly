@@ -116,22 +116,15 @@ class GroupModel(BaseModel):
         unique=True,
         nullable=False
     )
-    tg_id: Mapped[int] = mapped_column(
-        BigInteger,
-        unique=True,
+    tg_id: Mapped[list[int]] = mapped_column(
+        ARRAY(BigInteger),
+        default = list(),
         nullable=True
     )
-    vk_id: Mapped[int] = mapped_column(
-        BigInteger,
-        unique=True,
+    vk_id: Mapped[list[int]] = mapped_column(
+        ARRAY(BigInteger),
+        default = list(),
         nullable=True
-    )
-
-    __table_args__ = (
-        CheckConstraint(
-            "tg_id IS NOT NULL OR vk_id IS NOT NULL",
-            name="check_group_tg_vk"
-        ),
     )
 
 class SubjectModel(BaseModel):
@@ -258,7 +251,7 @@ class HomeworkModel(BaseModel):
     )
     attachment: Mapped[list[str]] = mapped_column(
         ARRAY(String),
-        default=list,
+        default=list(),
         nullable=False
     )
     created_at: Mapped[date] = mapped_column(
@@ -301,7 +294,7 @@ class HomeworkPolicyModel(BaseModel):
 
     __table_args__ = (
         CheckConstraint(
-            "lesons_left IS NOT NULL OR expires_at IS NOT NULL",
+            "lessons_left IS NOT NULL OR expires_at IS NOT NULL",
             name="check_lessons_expires"
         )
     )
@@ -328,10 +321,7 @@ class HomeworkScheduleModel(BaseModel):
         nullable=False
     )
     assigned_date: Mapped[date] = mapped_column(
-        ForeignKey(
-            "schedule.date",
-            ondelete="CASCADE"
-        ),
+        Date,
         nullable=False
     )
 
@@ -476,9 +466,6 @@ class GroupRepository(BaseRepository[GroupModel]):
             vk_id: int | None = None
     ) -> GroupModel:
 
-        if not any((tg_id,vk_id)):
-            raise ValueError("tg_id or vk_id is NoneType")
-
         if not code:
             raise ValueError("Group code is NoneType")
 
@@ -489,10 +476,10 @@ class GroupRepository(BaseRepository[GroupModel]):
         group = await self.get_by(**params_clean)
 
         if group:
-            if not group.tg_id and tg_id:
-                group.tg_id = tg_id
-            if not group.vk_id and vk_id:
-                group.vk_id = vk_id
+            if tg_id and tg_id not in group.tg_id:
+                group.tg_id.append(tg_id)
+            if vk_id and vk_id not in group.vk_id:
+                group.vk_id.append(vk_id)
 
             await self.session.commit()
             return group

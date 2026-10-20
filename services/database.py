@@ -473,11 +473,12 @@ class UserRepository(BaseRepository[UserModel]):
 
     async def ensure(self,
         group_id:int | None = None,
-        full_name:str | None = None,
+        name:str | None = None,
         tg_id:int | None = None,
         vk_id:int | None = None,
         academic_role:int | None = None,
-        admin_role:int | None = None
+        admin_role:int | None = None,
+        date_reg: date = date.today().strftime("%Y-%m-%d")
     ) -> UserModel:
         
         if not any((tg_id,vk_id)):
@@ -524,8 +525,7 @@ class GroupRepository(BaseRepository[GroupModel]):
 
     async def ensure(self,
             code:str | None = None,
-            tg_id: int | None = None,
-            vk_id: int | None = None
+            is_actualy: bool = True
     ) -> GroupModel:
 
         if not code:
@@ -538,17 +538,98 @@ class GroupRepository(BaseRepository[GroupModel]):
         group = await self.get_by(**params_clean)
 
         if group:
-            if tg_id and tg_id not in group.tg_id:
-                group.tg_id.append(tg_id)
-            if vk_id and vk_id not in group.vk_id:
-                group.vk_id.append(vk_id)
-
-            await self.session.commit()
             return group
 
         group = await self.add(**params_clean)
         log.info("New group added to the database")
         return group
+
+    async def switch(self, group_id: int | None = None, code: str | None = None) -> GroupModel:
+        if group_id is None and code is None:
+            raise ValueError("group code and group id are None")
+
+        params = locals()
+        params.pop("self")
+        params_clean = {k:v for k,v in params.items() if v is not None}
+
+        group = await self.get_by(**params_clean)
+
+        if group:
+            group.is_actualy = not group.is_actualy
+            await self.session.commit()
+            return group.is_actualy
+        
+        group = await self.ensure(code=code)
+        return group.is_actualy
+
+
+class GroupVkRepository(BaseRepository[GroupsVkModel]):
+    def __init__(self, session: AsyncSession):
+        super().__init__(GroupsVkModel, session)
+        
+    async def ensure(self,
+        group_id: int | None = None,
+        vk_id: int | None = None,
+        title: str | None = None,
+        users: int | None = None
+    ) -> GroupsVkModel:
+        if group_id is None or vk_id is None:
+            raise ValueError("group id or vk id are None")
+        
+        search_ids = {k:v for k,v in {"group_id":group_id, "vk_id":vk_id}.items() if v is not None}
+
+        group_vk = await self.get_by(**search_ids)
+
+        if group_vk:
+            if title and title != group_vk.title:
+                group_vk.title = title
+            if users and users != group_vk.users:
+                group_vk.users = users
+            await self.session.commit()
+            return group_vk
+        
+
+        params = locals()
+        params.pop("self")
+        params_clean = {k:v for k,v in params.items() if v is not None}
+
+        group_vk = self.add(**params_clean)
+        return group_vk
+
+
+class GroupTgRepository(BaseRepository[GroupsTgModel]):
+    def __init__(self, session: AsyncSession):
+        super().__init__(GroupsTgModel, session)
+        
+    async def ensure(self,
+        group_id: int | None = None,
+        vk_id: int | None = None,
+        title: str | None = None,
+        users: int | None = None
+    ) -> GroupsTgModel:
+        if group_id is None or vk_id is None:
+            raise ValueError("group id or tg id are None")
+        
+        search_ids = {k:v for k,v in {"group_id":group_id, "tg_id":tg_id}.items() if v is not None}
+
+        group_tg = await self.get_by(**search_ids)
+
+        if group_tg:
+            if title and title != group_tg.title:
+                group_tg.title = title
+            if users and users != group_tg.users:
+                group_tg.users = users
+            await self.session.commit()
+            return group_tg
+        
+
+        params = locals()
+        params.pop("self")
+        params_clean = {k:v for k,v in params.items() if v is not None}
+
+        group_tg = self.add(**params_clean)
+        return group_tg
+
 
 
 class SubjectRepository(BaseRepository[SubjectModel]):
@@ -611,6 +692,8 @@ class Database:
 
         self.users = UserRepository(session=self.session)
         self.groups = GroupRepository(session=self.session)
+        self.groups_vk = GroupVkRepository(session=self.session)
+        self.groups_tg = GroupTgRepository(session=self.session)
         self.subjects = SubjectRepository(session=self.session)
         self.schedule = ScheduleRepository(session=self.session)
         self.grades = GradeRepository(session=self.session)

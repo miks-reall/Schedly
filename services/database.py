@@ -240,7 +240,8 @@ class ScheduleModel(BaseModel):
     )
     classroom:Mapped[str] = mapped_column(
         nullable=True,
-        unique=False
+        unique=False,
+        default="Нет"
     )
     date: Mapped[date] = mapped_column(
         Date,
@@ -643,7 +644,7 @@ class SubjectRepository(BaseRepository[SubjectModel]):
     ) -> SubjectModel:
         
         if not all((title, group_id)):
-            raise ValueError("Title or Group id are NoneType")
+            raise ValueError("Title or Group id are None")
 
         params = locals()
         params.pop("self")
@@ -662,6 +663,34 @@ class SubjectRepository(BaseRepository[SubjectModel]):
 class ScheduleRepository(BaseRepository[ScheduleModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(ScheduleModel, session)
+    
+    def ensure(self,
+        group_id: int | None = None,
+        subject_id: int | None = None,
+        order: int | None = None,
+        classroom: str | None = None,
+        date: date | None = None
+    ) -> ScheduleModel:
+
+        params = locals()
+        params.pop("self")
+        items = {k:v for k,v in params.items() if v is not None}
+        search_items = {"group_id":items.get("group_id"), "subject_id":items.get("subject_id"), "date":items.get("date")}
+
+        if len(items) < len(params):
+            raise ValueError("One of params is None")
+        
+        schedule = await self.get_by(**search_items)
+
+        if schedule:
+            if classroom and not schedule.classroom:
+                schedule.classroom = classroom
+            
+            await self.session.commit()
+            return schedule
+        
+        schedule = await self.add(**items)
+        return schedule
 
 
 class GradeRepository(BaseRepository[GradeModel]):

@@ -97,11 +97,11 @@ from vkbottle import GroupEventType
 
 from services.database import Database, async_session
 from vk.keyboards import *
-from services.database import Database, async_session
 
 # inits
 labeler = BotLabeler()
-db = Database(async_session)
+with async_session() as session:
+    db = Database(session)
 
 
 #------------HANDLERS---------------------

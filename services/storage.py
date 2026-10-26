@@ -19,6 +19,30 @@ else
 end
 """
 
+class EventQueue:
+    def __init__(self, hub: 'RedisHub'):
+        self.hub = hub
+
+    async def push(self, queue_name: str, payload: dict[str, Any]) -> None:
+        if not self.hub.client:
+            raise RuntimeError("RedisHub не инициализирован")
+        
+        key = f"queue:{queue_name}"
+        data = json.dumps(payload, ensure_ascii=False)
+        await self.hub.client.rpush(key, data)
+
+    async def pop(self, queue_name: str, timeout: int = 5) -> dict[str, Any] | None:
+        if not self.hub.client:
+            raise RuntimeError("RedisHub не инициализирован")
+        
+        key = f"queue:{queue_name}"
+        result = await self.hub.client.blpop(key, timeout=timeout)
+        if result:
+            _, raw_data = result
+            return json.loads(raw_data)
+        return None
+
+
 class RedisHub:
     def __init__(self, url: str = "redis://localhost:6379/0"):
         self._url = url

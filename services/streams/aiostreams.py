@@ -25,7 +25,7 @@ class Producer:
         self.redis = redis_conn
         self.stream = stream
     
-    async def add(self, data:[str, Any] ) -> str:
+    async def add(self, data:dict[str, Any] ) -> str:
         return await self.redis.xadd(name=self.stream, fields=data)
 
 ''' Consumer (that who read data from a stream) class '''

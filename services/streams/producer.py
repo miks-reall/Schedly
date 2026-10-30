@@ -10,10 +10,15 @@ from time import sleep
 from redis import StrictRedis
 from random import randint as rand
 from redis_streams.producer import Producer
-from services.streams.common import REDIS_HOST, REDIS_PASS, REDIS_PORT, STREAM
+from services.streams.common import REDIS_HOST, REDIS_PASS, REDIS_PORT, STREAM, REDIS_USER
 
 ''' Initials '''
-redis_conn = StrictRedis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASS)
+redis_conn = StrictRedis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    password=REDIS_PASS,
+    username=REDIS_USER,
+)
 producer = Producer(redis_conn=redis_conn, stream=STREAM) 
 
 ''' Functions '''
